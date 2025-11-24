@@ -235,12 +235,16 @@ def mbarrier_wait_parity(mbarrier: int | PrimExpr | tir.Call, parity: int | Var)
     return tir.call_intrin("handle", tir.op.Op.get("tl.mbarrier_wait_parity"), mbarrier, parity)
 
 
-def mbarrier_arrive(mbarrier: int | PrimExpr | tir.Call, cta_id: int | PrimExpr | tir.Call | None = None):
+def mbarrier_arrive(mbarrier: int | PrimExpr | tir.Call, cta_id: int | PrimExpr | tir.Call | None = None, pred: int | PrimExpr | tir.Call | None = None):
     """Arrive at memory barrier.
 
     Args:
         mbarrier: Optional[int, PrimExpr]
             The memory barrier to arrive at
+        cta_id: Optional[int, PrimExpr]
+            The CTA id to arrive at
+        pred: Optional[int, PrimExpr]
+            The predicate to control the arrival
     """
     if isinstance(mbarrier, (tir.Call, tir.BufferLoad)):
         mbarrier = mbarrier
@@ -251,7 +255,7 @@ def mbarrier_arrive(mbarrier: int | PrimExpr | tir.Call, cta_id: int | PrimExpr 
     else:
         raise TypeError(f"mbarrier must be an integer or a tir.Call, but got {type(mbarrier)}")
     return ptx_arrive_barrier(mbarrier) if cta_id is None \
-            else tir.call_intrin("handle", tir.op.Op.get("tl.ptx_arrive_barrier_cluster"), mbarrier, cta_id)
+            else tir.call_intrin("handle", tir.op.Op.get("tl.ptx_arrive_barrier_cluster"), mbarrier, cta_id, pred)
 
 
 def mbarrier_expect_tx(*args):
@@ -459,7 +463,7 @@ def barrier_wait(barrier_id: int | PrimExpr | tir.Call, parity: int | Var | None
     return mbarrier_wait_parity(barrier_id, parity)
 
 
-def barrier_arrive(barrier_id: int | PrimExpr | tir.Call, cta_id: int | PrimExpr | tir.Call | None = None):
+def barrier_arrive(barrier_id: int | PrimExpr | tir.Call, cta_id: int | PrimExpr | tir.Call | None = None, pred: int | PrimExpr | tir.Call | None = None):
     """Arrive at a memory barrier.
 
     Args:
@@ -468,7 +472,7 @@ def barrier_arrive(barrier_id: int | PrimExpr | tir.Call, cta_id: int | PrimExpr
         cta_id: Optional[int, PrimExpr]
             The CTA id to arrive at
     """
-    return mbarrier_arrive(barrier_id, cta_id)
+    return mbarrier_arrive(barrier_id, cta_id, pred)
 
 
 def shfl_xor(value: int | PrimExpr | tir.Call, offset: int | PrimExpr | tir.Call):

@@ -321,7 +321,7 @@ TIR_DEFINE_TL_BUILTIN(st).set_num_inputs(4).set_attr<TCallEffectKind>(
 TIR_DEFINE_TL_BUILTIN(load_128b_from_gmem).set_num_inputs(2).set_attr<TCallEffectKind>(
     "TCallEffectKind", Integer(CallEffectKind::kOpaque));
 
-TIR_DEFINE_TL_BUILTIN(ptx_arrive_barrier_cluster).set_num_inputs(2).set_attr<TCallEffectKind>(
+TIR_DEFINE_TL_BUILTIN(ptx_arrive_barrier_cluster).set_num_inputs(-1).set_attr<TCallEffectKind>(
     "TCallEffectKind", Integer(CallEffectKind::kOpaque));
 } // namespace tl
 } // namespace tvm
