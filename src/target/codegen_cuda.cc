@@ -1539,6 +1539,12 @@ void CodeGenTileLangCUDA::VisitExpr_(const CallNode *op, std::ostream &os) {
                             "_" + op->args[3].as<StringImmNode>()->value;
     this->stream << func_name << "(" << this->PrintExpr(op->args[0]) << ", "
                  << this->PrintExpr(op->args[1]) << ");\n";
+  } else if (op->op.same_as(tl::load_128b_from_gmem())) {
+    this->PrintIndent();
+    this->stream << "tl::load_128b_from_gmem(" + this->PrintExpr(op->args[0]) + ", " + this->PrintExpr(op->args[1]) + ");\n";
+  } else if (op->op.same_as(tl::ptx_arrive_barrier_cluster())) {
+    this->PrintIndent();
+    this->stream << this->PrintExpr(op->args[0]) + ".arrive(uint32_t(" + this->PrintExpr(op->args[1]) + "));\n";
   } else if (op->op.same_as(tl::get_clock())) {
     os << "get_clock()";
   } else if (op->op.same_as(tl::loop_break())) {

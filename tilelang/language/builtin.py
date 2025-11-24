@@ -235,7 +235,7 @@ def mbarrier_wait_parity(mbarrier: int | PrimExpr | tir.Call, parity: int | Var)
     return tir.call_intrin("handle", tir.op.Op.get("tl.mbarrier_wait_parity"), mbarrier, parity)
 
 
-def mbarrier_arrive(mbarrier: int | PrimExpr | tir.Call):
+def mbarrier_arrive(mbarrier: int | PrimExpr | tir.Call, cta_id: int | PrimExpr | tir.Call | None = None):
     """Arrive at memory barrier.
 
     Args:
@@ -250,7 +250,8 @@ def mbarrier_arrive(mbarrier: int | PrimExpr | tir.Call):
         mbarrier = tir.BufferLoad(mbarrier, [0])
     else:
         raise TypeError(f"mbarrier must be an integer or a tir.Call, but got {type(mbarrier)}")
-    return ptx_arrive_barrier(mbarrier)
+    return ptx_arrive_barrier(mbarrier) if cta_id is None \
+            else tir.call_intrin("handle", tir.op.Op.get("tl.ptx_arrive_barrier_cluster"), mbarrier, cta_id)
 
 
 def mbarrier_expect_tx(*args):
@@ -458,14 +459,16 @@ def barrier_wait(barrier_id: int | PrimExpr | tir.Call, parity: int | Var | None
     return mbarrier_wait_parity(barrier_id, parity)
 
 
-def barrier_arrive(barrier_id: int | PrimExpr | tir.Call):
+def barrier_arrive(barrier_id: int | PrimExpr | tir.Call, cta_id: int | PrimExpr | tir.Call | None = None):
     """Arrive at a memory barrier.
 
     Args:
         barrier_id: Optional[int, PrimExpr]
             The memory barrier to arrive at
+        cta_id: Optional[int, PrimExpr]
+            The CTA id to arrive at
     """
-    return mbarrier_arrive(barrier_id)
+    return mbarrier_arrive(barrier_id, cta_id)
 
 
 def shfl_xor(value: int | PrimExpr | tir.Call, offset: int | PrimExpr | tir.Call):
@@ -761,3 +764,16 @@ def st(barrier: PrimExpr, value: PrimExpr, scope: str = "gpu", sem: str = "relax
     assert scope in ["gpu", "sys"], "Scope must be one of 'gpu', or 'sys'."
     assert sem in ["relaxed", "release"], "Semantic must be one of 'relaxed', or 'release'."
     return tir.call_intrin("handle", tir.op.Op.get("tl.st"), address_of(barrier), value, sem, scope)
+
+def load_128b_from_gmem(src: PrimExpr, dst: PrimExpr):
+    """Load 128 bits from global memory to shared memory.
+    
+    Args:
+        src: The source address in global memory
+        dst: The destination address in register
+
+    Returns:
+        tir.Call: A handle to the load operation
+    """
+
+    return tir.call_intrin("handle", tir.op.Op.get("tl.load_128b_from_gmem"), address_of(dst), address_of(src))

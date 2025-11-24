@@ -553,6 +553,24 @@ TVM_DLL const Op &atom_add();
  */
 TVM_DLL const Op &st();
 
+
+/*!
+ * \brief tilelang intrinsic for loading 128 bits from global memory.
+ *
+ *  This op is used to represent a 128-bit load operation from global memory
+ * in tilelang.
+ */
+TVM_DLL const Op &load_128b_from_gmem();
+
+
+/*!
+ * \brief tilelang intrinsic for PTX arrive barrier cluster.
+ *
+ *  This op is used to represent a PTX arrive barrier cluster operation in
+ * tilelang.
+ */
+TVM_DLL const Op &ptx_arrive_barrier_cluster();
+
 } // namespace tl
 } // namespace tvm
 
