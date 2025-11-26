@@ -781,3 +781,15 @@ def load_128b_from_gmem(src: PrimExpr, dst: PrimExpr):
     """
 
     return tir.call_intrin("handle", tir.op.Op.get("tl.load_128b_from_gmem"), address_of(dst), address_of(src))
+
+def load_64b_from_gmem(src: PrimExpr, dst: PrimExpr):
+    """Load 64 bits from global memory to register or shared memory.
+
+    Args:
+        src: The source address in global memory
+        dst: The destination address in register or shared
+
+    Returns:
+        tir.Call: A handle to the load operation
+    """
+    return tir.call_intrin("handle", tir.op.Op.get("tl.load_64b_from_gmem"), address_of(dst), address_of(src))

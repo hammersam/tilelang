@@ -562,6 +562,14 @@ TVM_DLL const Op &st();
  */
 TVM_DLL const Op &load_128b_from_gmem();
 
+/*!
+ * \brief tilelang intrinsic for loading 64 bits from global memory.
+ *
+ *  This op is used to represent a 64-bit load operation from global memory
+ * in tilelang.
+ */
+TVM_DLL const Op &load_64b_from_gmem();
+
 
 /*!
  * \brief tilelang intrinsic for PTX arrive barrier cluster.

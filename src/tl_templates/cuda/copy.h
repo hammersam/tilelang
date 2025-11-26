@@ -447,6 +447,47 @@ TL_DEVICE void load_128b_from_gmem(T* dst, const void* addr) {
 }
 
 
+template<
+    typename T,
+    L1CacheHint l1_cache_hint=L1CacheHint::EVICT_LAST,
+    L2PrefetchHint l2_prefetch_hint=L2PrefetchHint::B256
+>
+TL_DEVICE void load_64b_from_gmem(T* dst, const void* addr) {
+    int2 ret;
+
+    #define EXEC64(L1_HINT_STR, L2_HINT_STR) {                                  \
+        asm volatile(                                                           \
+            "ld.global.nc.L1::" L1_HINT_STR ".L2::" L2_HINT_STR ".v2.s32 "      \
+            "{%0, %1}, [%2];"                                                   \
+            : "=r"(ret.x), "=r"(ret.y)                                          \
+            : "l"(addr));                                                       \
+    }
+
+    #define DISPATCH_L2_64(L1_HINT_STR) {                                       \
+        if constexpr (l2_prefetch_hint == L2PrefetchHint::B64)                  \
+            EXEC64(L1_HINT_STR, "64B")                                          \
+        else if constexpr (l2_prefetch_hint == L2PrefetchHint::B128)            \
+            EXEC64(L1_HINT_STR, "128B")                                         \
+        else if constexpr (l2_prefetch_hint == L2PrefetchHint::B256)            \
+            EXEC64(L1_HINT_STR, "256B")                                         \
+    }
+
+    if constexpr (l1_cache_hint == L1CacheHint::NO_ALLOCATE)
+        DISPATCH_L2_64("no_allocate")
+    else if constexpr (l1_cache_hint == L1CacheHint::EVICT_FIRST)
+        DISPATCH_L2_64("evict_first")
+    else if constexpr (l1_cache_hint == L1CacheHint::EVICT_NORMAL)
+        DISPATCH_L2_64("evict_normal")
+    else if constexpr (l1_cache_hint == L1CacheHint::EVICT_LAST)
+        DISPATCH_L2_64("evict_last")
+
+    #undef EXEC64
+    #undef DISPATCH_L2_64
+
+    *reinterpret_cast<int2*>(dst) = ret;
+}
+
+
 
 // FIXME: PEER_ADDR_MASK may be invalid for some cluster configurations
 static constexpr int PEER_ADDR_MASK =
