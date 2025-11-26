@@ -298,7 +298,13 @@ tilelang.disable_cache()
 #     """
 #     return code
     
-@tilelang.jit(out_idx=[-1],)
+pass_configs = {
+    tilelang.PassConfigKey.TL_DISABLE_THREAD_STORAGE_SYNC: True,
+}
+@tilelang.jit(
+    out_idx=[-1],
+    pass_configs=pass_configs,
+)
 def matmul(M,
            N,
            K,
@@ -339,13 +345,14 @@ def matmul(M,
             cur_fp32x8[i] = T.cast(cur_fp8x16[i + thread_offset], "float")
         for i in T.vectorized(8):
             cur_bf16x8[i] = T.cast(cur_fp32x8[i], "bfloat16")
-        T.put_thread(
-            src=T.address_of(cur_bf16x8[0]),
-            dst=T.address_of(B_shared[offset_k, lane_idx % 8 * 16 + thread_offset]),
-            size=0,
-            mbar=T.address_of(bar_k_remote_ready),
-            dst_pe=(cx + 1) % cluster_size,
-            scope="cluster")
+        if cluster_size > 1:
+            T.put_thread(
+                src=T.address_of(cur_bf16x8[0]),
+                dst=T.address_of(B_shared[offset_k, lane_idx % 8 * 16 + thread_offset]),
+                size=0,
+                mbar=T.address_of(bar_k_remote_ready),
+                dst_pe=(cx + 1) % cluster_size,
+                scope="cluster")
         for i in T.vectorized(8):
             # FIXME: check shared memory swizzle
             B_shared[offset_k, lane_idx % 8 * 16 + i + thread_offset] = cur_bf16x8[i]
@@ -374,11 +381,12 @@ def matmul(M,
         warp_idx,
         lane_idx,
     ):
-        T.barrier_wait(bar_k_avail, (ko + 1) % 2)
-        if idx_in_warpgroup == 0:
-            T.ptx_arrive_barrier_expect_tx(
-                bar_k_remote_ready[0], 
-                block_K * block_N // cluster_size * 2)
+        if cluster_size > 1:
+            T.barrier_wait(bar_k_avail, (ko + 1) % 2)
+            if idx_in_warpgroup == 0:
+                T.ptx_arrive_barrier_expect_tx(
+                    bar_k_remote_ready[0], 
+                    block_K * block_N // cluster_size * 2)
         
         T.barrier_wait(compute_is_done, (ko + 1) % 2)
         T.copy(A[bx * block_M, (num_stages * ko + buffer_id) * block_K], A_shared)
@@ -420,12 +428,14 @@ def matmul(M,
         idx_in_warpgroup,
     ):
         T.barrier_wait(data_is_ready, ko % 2)
-        T.barrier_wait(bar_k_remote_ready, ko % 2)
+        if cluster_size > 1:
+            T.barrier_wait(bar_k_remote_ready, ko % 2)
         T.gemm(A_shared, B_shared, C_local)
         T.barrier_arrive(compute_is_done)
         # TODO: better to provide a cleaner API
-        T.barrier_arrive(bar_k_avail, 0, idx_in_warpgroup == 32)
-        T.barrier_arrive(bar_k_avail, 1, idx_in_warpgroup == 64)
+        if cluster_size > 1:
+            T.barrier_arrive(bar_k_avail, 0, idx_in_warpgroup == 32)
+            T.barrier_arrive(bar_k_avail, 1, idx_in_warpgroup == 64)
         
     @T.prim_func
     def main_cluster(
