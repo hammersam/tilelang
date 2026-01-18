@@ -29,7 +29,8 @@ public:
   void clear() { has_producer_buffer_ = false; }
 
   void VisitExpr_(const CallNode *call) final {
-    if (call->op.same_as(tma_load()) || call->op.same_as(tma_load_im2col())) {
+    if (call->op.same_as(tma_load()) || call->op.same_as(tma_load_im2col()) ||
+        call->op.same_as(tma_load_multicast())) {
       has_producer_buffer_ = true;
     }
     StmtExprVisitor::VisitExpr_(call);
@@ -100,7 +101,8 @@ public:
   }
 
   void VisitExpr_(const CallNode *op) final {
-    if (op->op.same_as(tma_load()) || op->op.same_as(tma_load_im2col())) {
+    if (op->op.same_as(tma_load()) || op->op.same_as(tma_load_im2col()) ||
+        op->op.same_as(tma_load_multicast())) {
       for (auto arg : op->args) {
         if (auto buffer_load = arg.as<BufferLoadNode>()) {
           producer_buffers_.insert(buffer_load->buffer.get());
@@ -134,7 +136,8 @@ public:
   void VisitStmt_(const EvaluateNode *op) final {
     Role role = Role::kConsumer;
     if (auto call = op->value.as<CallNode>()) {
-      if (call->op.same_as(tma_load()) || call->op.same_as(tma_load_im2col())) {
+      if (call->op.same_as(tma_load()) || call->op.same_as(tma_load_im2col()) ||
+          call->op.same_as(tma_load_multicast())) {
         role = Role::kProducer;
         has_bulk_copy_ = true;
       }
@@ -311,7 +314,8 @@ public:
 private:
   PrimExpr VisitExpr_(const CallNode *op) final {
     auto call = Downcast<Call>(StmtExprMutator::VisitExpr_(op));
-    if (call->op.same_as(tma_load()) || call->op.same_as(tma_load_im2col())) {
+    if (call->op.same_as(tma_load()) || call->op.same_as(tma_load_im2col()) ||
+        call->op.same_as(tma_load_multicast())) {
       auto mbar = makeGetBarrier(producer_barrier_idx_);
       auto arg0 = call->args[0].as<Call>();
       // Check if this is a 1D TMA load
@@ -383,6 +387,7 @@ private:
   PrimExpr VisitExpr_(const CallNode *op) final {
     if (op->op.same_as(tl::tma_load()) ||
         op->op.same_as(tl::tma_load_im2col()) ||
+        op->op.same_as(tl::tma_load_multicast()) ||
         op->op.same_as(tl::tma_store())) {
       has_tma_op_ = true;
     }

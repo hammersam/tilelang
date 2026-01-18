@@ -1434,6 +1434,34 @@ void CodeGenTileLangCUDA::VisitExpr_(const CallNode *op, std::ostream &os) {
       ss << "tl::tma_load_im2col";
     }
     print_extern_call_stmt(ss.str(), 0, 1);
+  } else if (op->op.same_as(tl::tma_load_multicast())) {
+    // tma_load_multicast(descriptor, mbarrier, smem_data, multicast_mask,
+    // coord_0, coord_1, ..., eviction_policy)
+    std::ostringstream ss;
+    ICHECK_GE(op->args.size(), 5);
+    auto eviction_policy =
+        this->eviction_policy_names_
+            [op->args[op->args.size() - 1].as<IntImmNode>()->value];
+    if (eviction_policy != "EVICT_NORMAL") {
+      ss << "tl::tma_load_multicast<tl::CacheHintSm90::" << eviction_policy
+         << ">(";
+    } else {
+      ss << "tl::tma_load_multicast(";
+    }
+    auto desc = op->args[0];
+    ss << this->PrintExpr(desc) << ", ";
+    ss << print_mbarrier_obj(op->args[1]) << ", ";
+    // smem_data (args[2])
+    ss << this->PrintExpr(op->args[2]) << ", ";
+    // multicast_mask (args[3])
+    ss << "(uint16_t)" << this->PrintExpr(op->args[3]);
+    // coords (args[4] to args[size-2])
+    for (size_t i = 4; i < op->args.size() - 1; i++) {
+      ss << ", " << this->PrintExpr(op->args[i]);
+    }
+    ss << ");\n";
+    this->PrintIndent();
+    this->stream << ss.str();
   } else if (op->op.same_as(tl::tma_store())) {
     std::stringstream ss;
     auto need_reduce = op->args[op->args.size() - 2].as<IntImmNode>()->value;

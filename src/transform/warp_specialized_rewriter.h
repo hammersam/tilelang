@@ -69,7 +69,7 @@ private:
 
   void VisitExpr_(const CallNode *op) final {
     if (op->op.same_as(tma_load()) || op->op.same_as(tma_load_im2col()) ||
-        op->op.same_as(set_max_nreg())) {
+        op->op.same_as(tma_load_multicast()) || op->op.same_as(set_max_nreg())) {
       has_tma_op_ = true;
     }
     IRVisitorWithAnalyzer::VisitExpr_(op);

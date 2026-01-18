@@ -196,6 +196,19 @@ TVM_DLL const Op &tma_load();
 TVM_DLL const Op &tma_load_im2col();
 
 /*!
+ * \brief tvm intrinsics for loading data from global tensor descriptor to
+ * shared memory with multicast to multiple blocks in a cluster
+ *
+ * tma_load_multicast(descriptor, mbarrier, smem_data, multicast_mask, coord_0,
+ * coord_1, ...)
+ *
+ * The multicast_mask is a 16-bit mask indicating which blocks in the cluster
+ * should receive the data. For example, mask=0b11 broadcasts to 2 blocks.
+ *
+ */
+TVM_DLL const Op &tma_load_multicast();
+
+/*!
  * \brief tvm intrinsics for storing data from shared memory to global tensor
  * descriptor
  *

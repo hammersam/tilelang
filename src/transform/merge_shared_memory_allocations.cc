@@ -338,7 +338,8 @@ public:
 private:
   void VisitExpr_(const CallNode *op) {
     if (op->op.same_as(tl::tl_gemm()) || op->op.same_as(tl::tl_gemm_sp()) ||
-        op->op.same_as(tl::tma_load()) || op->op.same_as(tl::tma_store())) {
+        op->op.same_as(tl::tma_load()) || op->op.same_as(tl::tma_load_multicast()) ||
+        op->op.same_as(tl::tma_store())) {
       under_alignment_scope_ = true;
       StmtExprVisitor::VisitExpr_(op);
       under_alignment_scope_ = false;

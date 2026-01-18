@@ -63,12 +63,19 @@ public:
 
 private:
   void VisitExpr_(const CallNode *call) final {
-    if (call->op.same_as(tma_load()) || call->op.same_as(tma_load_im2col())) {
+    if (call->op.same_as(tma_load()) || call->op.same_as(tma_load_im2col()) ||
+        call->op.same_as(tma_load_multicast())) {
       auto arg0 = call->args[0].as<Call>();
       if (call->op.same_as(tma_load()) && arg0 &&
           !arg0.value()->op.same_as(create_tma_descriptor())) {
         // 1D TMA load has tvm_access_ptr of shared tensor in its args[0]
         bulk_copy_bytes = call->args[3] * loop_extents;
+      } else if (call->op.same_as(tma_load_multicast())) {
+        // tma_load_multicast: args[2] is smem_addr (access_ptr)
+        Call access_ptr = Downcast<Call>(call->args[2]);
+        ICHECK(access_ptr->op.same_as(builtin::tvm_access_ptr()));
+        int type_bytes = access_ptr->args[0]->dtype.bytes();
+        bulk_copy_bytes += access_ptr->args[3] * loop_extents * type_bytes;
       } else {
         Call access_ptr = Downcast<Call>(call->args[2]);
         ICHECK(access_ptr->op.same_as(builtin::tvm_access_ptr()));
@@ -163,13 +170,15 @@ private:
   }
 
   PrimExpr VisitExpr_(const CallNode *op) {
-    if (op->op.same_as(tma_load()) || op->op.same_as(tma_load_im2col())) {
+    if (op->op.same_as(tma_load()) || op->op.same_as(tma_load_im2col()) ||
+        op->op.same_as(tma_load_multicast())) {
       auto arg0 = op->args[0].as<Call>();
       bool is_1d_tma_load =
           arg0 && !arg0.value()->op.same_as(create_tma_descriptor()) &&
           op->op.same_as(tma_load());
       visited_tma_load_ = true;
       Array<PrimExpr> new_args = op->args;
+      // For tma_load_multicast, mbarrier is at args[1]
       new_args.Set(is_1d_tma_load ? 2 : 1,
                    Call(DataType::Handle(), get_mbarrier(),
                         {IntImm(DataType::Int(32), 0)}));
@@ -203,7 +212,8 @@ private:
 
   void VisitStmt_(const EvaluateNode *op) final {
     if (const auto *call = op->value.as<CallNode>()) {
-      if (call->op.same_as(tma_load()) || call->op.same_as(tma_load_im2col())) {
+      if (call->op.same_as(tma_load()) || call->op.same_as(tma_load_im2col()) ||
+          call->op.same_as(tma_load_multicast())) {
         pending_tma_ops_.push_back(GetRef<Call>(call));
       } else if (call->op.same_as(mbarrier_expect_tx())) {
         pending_tma_ops_.push_back(GetRef<Call>(call));
@@ -451,7 +461,8 @@ private:
   }
 
   PrimExpr VisitExpr_(const CallNode *op) {
-    if (op->op.same_as(tma_load()) || op->op.same_as(tma_load_im2col())) {
+    if (op->op.same_as(tma_load()) || op->op.same_as(tma_load_im2col()) ||
+        op->op.same_as(tma_load_multicast())) {
       // check this must be in the tma_op_to_barrier_id_
       ICHECK(tma_op_to_barrier_id_.count(GetRef<Call>(op)))
           << "tma_load must be in the tma_op_to_barrier_id_";
@@ -464,6 +475,7 @@ private:
       if (is_1d_tma_load) {
         new_args.Set(2, barrier_id);
       } else {
+        // For tma_load_multicast, barrier is at args[1]
         new_args.Set(1, barrier_id);
       }
       return Call(op->dtype, op->op, new_args);

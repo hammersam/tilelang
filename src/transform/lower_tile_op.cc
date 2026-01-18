@@ -485,6 +485,7 @@ private:
   PrimExpr VisitExpr_(const tir::CallNode *op) final {
     if ((!has_tma_) && (op->op.same_as(tl::tma_load()) ||
                         op->op.same_as(tl::tma_load_im2col()) ||
+                        op->op.same_as(tl::tma_load_multicast()) ||
                         op->op.same_as(tl::tma_store()))) {
       has_tma_ = true;
     }
