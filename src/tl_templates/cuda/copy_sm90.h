@@ -26,6 +26,22 @@ TL_DEVICE void tma_load(void *smem_ptr, void *gmem_ptr, BarrierType &smem_mbar,
                :);
 }
 
+/*
+
+// 1D bulk copy, no tensor descriptor
+// PTX: cp.async.bulk.shared::cluster.global.mbarrier::complete_tx::bytes.multicast::cluster
+// 适用于：连续内存块的简单拷贝
+
+// 源地址和目标地址都是线性地址
+void* src = global_ptr + offset;      // 全局内存线性地址
+void* dst = smem_ptr;                 // 共享内存地址
+size_t bytes = 2048;                  // 拷贝字节数
+uint16_t mask = 0b11;                 // 广播到 2 个 block
+
+tl::tma_load_multicast(dst, src, bytes, mbar, mask);
+
+*/
+
 TL_DEVICE void tma_load_multicast(void *smem_ptr, void *gmem_ptr,
                                   uint64_t &smem_mbar, uint32_t size,
                                   uint16_t mask) {
@@ -37,6 +53,42 @@ TL_DEVICE void tma_load_multicast(void *smem_ptr, void *gmem_ptr,
       "l"(gmem_ptr), "r"(size), "r"(smem_int_mbar), "h"(mask)
       :);
 }
+
+/*
+
+// TensorMap 包含的信息
+struct TensorMapInfo {
+    void* base_address;        // 全局内存基地址
+    uint64_t shape[5];         // 张量形状 (最多5D)
+    uint64_t stride[5];        // 每个维度的 stride
+    uint32_t box_size[5];      // 每次加载的 tile 大小
+    DataType dtype;            // 数据类型
+    SwizzleMode swizzle;       // Swizzle 模式 (优化 bank conflict)
+    // ...
+};
+
+# 在 tilelang 中
+desc = T.create_tma_descriptor(
+    tensor=A,           # 源张量
+    shape=[M, K],       # 张量形状
+    tile_shape=[64, 64] # 每次加载的 tile 大小
+)
+
+*/
+
+/*
+
+// PTX: cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes.multicast::cluster.L2::cache_hint
+// 适用于：复杂张量访问模式
+// 使用坐标而不是线性地址
+CUtensorMap descriptor;  // 预先创建的张量描述符
+int coord_x = tile_x * TILE_M;        // X 坐标
+int coord_y = tile_y * TILE_K;        // Y 坐标
+uint16_t mask = 0b11;                 // 广播到 2 个 block
+
+tl::tma_load_multicast(descriptor, mbar, smem_ptr, mask, coord_x, coord_y);
+
+*/
 
 // TMA load with multicast using TensorMap descriptor (2D)
 template <CacheHintSm90 cache_hint = CacheHintSm90::EVICT_NORMAL,

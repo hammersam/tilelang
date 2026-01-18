@@ -33,10 +33,17 @@ def copy_cluster(M, N, block_M, block_N, threads, cluster, dtype="float16"):
             bar_ready = T.alloc_barrier(arrive_count=1)
 
             if (tx == 0):
+                # 需要确保接收到32 * 32 * 2 = 2048 bytes
+                # 将bar_ready这个barrier的arrive count消耗至0
                 T.ptx_arrive_barrier_expect_tx(bar_ready[0], 2048)
 
+            # 读取数据
             T.copy(A[bx * block_M, by * block_N], A_local)
+            # cluster内通信，发送到下一个processing element
             for i in T.serial(4):
+                # 假设block_M = block_N = 32, threads = 32，
+                # 每个线程负责加载8个元素，一个iter中32个线程总共
+                # 加载256个元素，需要四个迭代加载完成
                 T.put_thread(
                     src=T.address_of(A_local[(i * 256 + tx * 8) // block_N,
                                              (i * 256 + tx * 8) % block_N]),
@@ -44,10 +51,14 @@ def copy_cluster(M, N, block_M, block_N, threads, cluster, dtype="float16"):
                                               (i * 256 + tx * 8) % block_N]),
                     size=0,
                     mbar=T.address_of(bar_ready),
+                    # 发送到cluster内的另一个block
                     dst_pe=(cx + 1) % cluster[0],
+                    # cluster作用域
                     scope="cluster")
+            # 等待接收到所有数据
             T.barrier_wait(bar_ready, 0)
             T.copy(B_shared, B[(bx ^ 1) * block_M, by * block_N])
+            # cluster级别同步
             T.sync_cluster()
 
     return main

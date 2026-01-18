@@ -87,6 +87,21 @@ PutOp::PutOp(Array<PrimExpr> args, BufferMap vmap) {
   (void)vmap;
 }
 
+// Example:
+// Stmt LowerClusterCopy(PrimExpr src_addr, PrimExpr dst_addr, PrimExpr mbarr_addr) {
+//     // 1. 获取对等地址（cluster内的目标block地址）
+//     PrimExpr mapped_dst_addr = Call(builtin::call_extern(), {"tl::get_peer_addr", dst_addr});
+//     PrimExpr mapped_bar_addr = Call(builtin::call_extern(), {"tl::get_peer_addr", mbarr_addr});
+//     
+//     // 2. 调用 st_async_128b（128-bit 异步存储）
+//     Call(builtin::call_extern(), {
+//         "tl::st_async_128b",
+//         mapped_dst_addr,
+//         "*reinterpret_cast<float4*>(src_addr)",  // float4 = 128 bits
+//         mapped_bar_addr
+//     });
+// }
+
 // TODO: generalize to other sizes
 Stmt LowerClusterCopy(PrimExpr src_addr, PrimExpr dst_addr,
                       PrimExpr mbarr_addr) {

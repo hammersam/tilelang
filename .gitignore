@@ -110,3 +110,4 @@ nvshmem_src/
 # CMake
 cmake-build/
 cmake-build-*/
+.vscode-ctags

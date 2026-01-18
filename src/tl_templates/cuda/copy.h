@@ -381,9 +381,12 @@ template <typename T>
 TL_DEVICE void
 st_async_128b(void *dst_ptr, const T &data,
               const cutlass::arch::ClusterTransactionBarrier *mbar_ptr) {
+  // long2 = 128 bits
   long2 data_long2 = *reinterpret_cast<const long2 *>(&data);
   uint32_t dst_addr = cute::cast_smem_ptr_to_uint(dst_ptr);
   uint32_t mbar_addr = cute::cast_smem_ptr_to_uint(mbar_ptr);
+  // v2.s64表示两个64-bit整数一共128bits
+  // 每次数据传输128bits = 16 bytes
   asm volatile("st.async.weak.shared::cluster.mbarrier::complete_tx::bytes.v2."
                "s64 [%0], {%1, %2}, [%3]; \n"
                :
